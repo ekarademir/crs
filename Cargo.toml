@@ -1,0 +1,3 @@
+[workspace]
+resolver = "3"
+members = ["concerto-core", "concerto-macros", "concerto-metamodel"]
