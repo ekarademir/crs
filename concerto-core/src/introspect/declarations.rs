@@ -1,57 +1,155 @@
 use concerto_metamodel::concerto_metamodel_1_0_0 as mm;
 
+use crate::error::{ConcertoError, Result};
+use crate::model_util;
+
 use super::properties::PropertyDecl;
 use super::traits::{Decorated, HasProperties, Identifiable, Named};
 
+use concerto_macros::{Decorated, HasProperties, Identifiable, Named};
+
 // ===================================================================
-// Newtype wrappers for each metamodel declaration struct
+// Flattened class-declaration structs
 // ===================================================================
 
-/// Wraps `mm::ConceptDeclaration`.
-#[derive(Debug, Clone)]
+/// A concept declaration with fields extracted from the metamodel AST.
+#[derive(Debug, Clone, Decorated, Named, HasProperties, Identifiable)]
 pub struct ConceptDeclaration {
-    pub(crate) inner: mm::ConceptDeclaration,
+    pub(crate) name: String,
+    pub(crate) decorators: Option<Vec<mm::Decorator>>,
+    pub(crate) location: Option<mm::Range>,
+    pub(crate) is_abstract: bool,
+    pub(crate) identified: Option<mm::Identified>,
+    pub(crate) super_type: Option<mm::TypeIdentifier>,
     pub(crate) properties: Vec<PropertyDecl>,
 }
 
-/// Wraps `mm::AssetDeclaration`.
-#[derive(Debug, Clone)]
+/// An asset declaration with fields extracted from the metamodel AST.
+#[derive(Debug, Clone, Decorated, Named, HasProperties, Identifiable)]
 pub struct AssetDeclaration {
-    pub(crate) inner: mm::AssetDeclaration,
+    pub(crate) name: String,
+    pub(crate) decorators: Option<Vec<mm::Decorator>>,
+    pub(crate) location: Option<mm::Range>,
+    pub(crate) is_abstract: bool,
+    pub(crate) identified: Option<mm::Identified>,
+    pub(crate) super_type: Option<mm::TypeIdentifier>,
     pub(crate) properties: Vec<PropertyDecl>,
 }
 
-/// Wraps `mm::ParticipantDeclaration`.
-#[derive(Debug, Clone)]
+/// A participant declaration with fields extracted from the metamodel AST.
+#[derive(Debug, Clone, Decorated, Named, HasProperties, Identifiable)]
 pub struct ParticipantDeclaration {
-    pub(crate) inner: mm::ParticipantDeclaration,
+    pub(crate) name: String,
+    pub(crate) decorators: Option<Vec<mm::Decorator>>,
+    pub(crate) location: Option<mm::Range>,
+    pub(crate) is_abstract: bool,
+    pub(crate) identified: Option<mm::Identified>,
+    pub(crate) super_type: Option<mm::TypeIdentifier>,
     pub(crate) properties: Vec<PropertyDecl>,
 }
 
-/// Wraps `mm::TransactionDeclaration`.
-#[derive(Debug, Clone)]
+/// A transaction declaration with fields extracted from the metamodel AST.
+#[derive(Debug, Clone, Decorated, Named, HasProperties, Identifiable)]
 pub struct TransactionDeclaration {
-    pub(crate) inner: mm::TransactionDeclaration,
+    pub(crate) name: String,
+    pub(crate) decorators: Option<Vec<mm::Decorator>>,
+    pub(crate) location: Option<mm::Range>,
+    pub(crate) is_abstract: bool,
+    pub(crate) identified: Option<mm::Identified>,
+    pub(crate) super_type: Option<mm::TypeIdentifier>,
     pub(crate) properties: Vec<PropertyDecl>,
 }
 
-/// Wraps `mm::EventDeclaration`.
-#[derive(Debug, Clone)]
+/// An event declaration with fields extracted from the metamodel AST.
+#[derive(Debug, Clone, Decorated, Named, HasProperties, Identifiable)]
 pub struct EventDeclaration {
-    pub(crate) inner: mm::EventDeclaration,
+    pub(crate) name: String,
+    pub(crate) decorators: Option<Vec<mm::Decorator>>,
+    pub(crate) location: Option<mm::Range>,
+    pub(crate) is_abstract: bool,
+    pub(crate) identified: Option<mm::Identified>,
+    pub(crate) super_type: Option<mm::TypeIdentifier>,
     pub(crate) properties: Vec<PropertyDecl>,
 }
 
-/// Wraps `mm::EnumDeclaration`.
-#[derive(Debug, Clone)]
+/// An enum declaration with fields extracted from the metamodel AST.
+#[derive(Debug, Clone, Decorated, Named)]
 pub struct EnumDeclaration {
-    pub(crate) inner: mm::EnumDeclaration,
+    pub(crate) name: String,
+    pub(crate) decorators: Option<Vec<mm::Decorator>>,
+    pub(crate) location: Option<mm::Range>,
     pub(crate) properties: Vec<PropertyDecl>,
+}
+
+impl HasProperties for EnumDeclaration {
+    fn own_properties(&self) -> &[PropertyDecl] {
+        &self.properties
+    }
+    fn super_type(&self) -> Option<&mm::TypeIdentifier> {
+        None
+    }
+    fn is_abstract(&self) -> bool {
+        false
+    }
+}
+
+impl Identifiable for EnumDeclaration {
+    fn is_identified(&self) -> bool {
+        false
+    }
+    fn is_system_identified(&self) -> bool {
+        false
+    }
+    fn is_explicitly_identified(&self) -> bool {
+        false
+    }
+    fn identifier_field_name(&self) -> Option<&str> {
+        None
+    }
 }
 
 /// Wraps `mm::MapDeclaration`.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Decorated, Named)]
 pub struct MapDeclaration(pub(crate) mm::MapDeclaration);
+
+// ===================================================================
+// Constructors from metamodel types
+// ===================================================================
+
+macro_rules! impl_class_decl_new {
+    ($rust_ty:ident, $mm_ty:ty) => {
+        impl $rust_ty {
+            pub(crate) fn new(mm: $mm_ty, properties: Vec<PropertyDecl>) -> Self {
+                Self {
+                    name: mm.name,
+                    decorators: mm.decorators,
+                    location: mm.location,
+                    is_abstract: mm.is_abstract,
+                    identified: mm.identified,
+                    super_type: mm.super_type,
+                    properties,
+                }
+            }
+        }
+    };
+}
+
+impl_class_decl_new!(ConceptDeclaration, mm::ConceptDeclaration);
+impl_class_decl_new!(AssetDeclaration, mm::AssetDeclaration);
+impl_class_decl_new!(ParticipantDeclaration, mm::ParticipantDeclaration);
+impl_class_decl_new!(TransactionDeclaration, mm::TransactionDeclaration);
+impl_class_decl_new!(EventDeclaration, mm::EventDeclaration);
+
+impl EnumDeclaration {
+    pub(crate) fn new(mm: mm::EnumDeclaration, properties: Vec<PropertyDecl>) -> Self {
+        Self {
+            name: mm.name,
+            decorators: mm.decorators,
+            location: mm.location,
+            properties,
+        }
+    }
+}
 
 // ===================================================================
 // ScalarDeclKind — sum over scalar sub-types
@@ -97,169 +195,131 @@ pub enum Declaration {
 }
 
 // ===================================================================
-// Trait impls — Decorated / Named for each newtype
+// TryFrom<serde_json::Value> — construct from AST JSON
 // ===================================================================
 
-macro_rules! impl_decorated_for_inner {
-    ($ty:ty, $field:ident) => {
-        impl Decorated for $ty {
-            fn decorators(&self) -> &[mm::Decorator] {
-                self.inner.$field.as_deref().unwrap_or(&[])
+fn parse_properties_from_json(value: &serde_json::Value) -> Result<Vec<PropertyDecl>> {
+    match value.get("properties") {
+        Some(serde_json::Value::Array(arr)) => {
+            arr.iter().map(|v| PropertyDecl::try_from(v.clone())).collect()
+        }
+        _ => Ok(vec![]),
+    }
+}
+
+macro_rules! impl_try_from_for_class_decl {
+    ($rust_ty:ident, $mm_ty:ty, $variant:ident, $label:expr) => {
+        impl TryFrom<serde_json::Value> for $rust_ty {
+            type Error = ConcertoError;
+            fn try_from(value: serde_json::Value) -> Result<Self> {
+                let inner: $mm_ty =
+                    serde_json::from_value(value.clone()).map_err(|e| ConcertoError::IllegalModel {
+                        message: format!(concat!("Invalid ", $label, ": {}"), e),
+                        file_name: None,
+                        location: None,
+                    })?;
+                let properties = parse_properties_from_json(&value)?;
+                Ok(Self::new(inner, properties))
             }
         }
     };
 }
 
-impl_decorated_for_inner!(ConceptDeclaration, decorators);
-impl_decorated_for_inner!(AssetDeclaration, decorators);
-impl_decorated_for_inner!(ParticipantDeclaration, decorators);
-impl_decorated_for_inner!(TransactionDeclaration, decorators);
-impl_decorated_for_inner!(EventDeclaration, decorators);
-impl_decorated_for_inner!(EnumDeclaration, decorators);
+impl_try_from_for_class_decl!(ConceptDeclaration, mm::ConceptDeclaration, Concept, "ConceptDeclaration");
+impl_try_from_for_class_decl!(AssetDeclaration, mm::AssetDeclaration, Asset, "AssetDeclaration");
+impl_try_from_for_class_decl!(ParticipantDeclaration, mm::ParticipantDeclaration, Participant, "ParticipantDeclaration");
+impl_try_from_for_class_decl!(TransactionDeclaration, mm::TransactionDeclaration, Transaction, "TransactionDeclaration");
+impl_try_from_for_class_decl!(EventDeclaration, mm::EventDeclaration, Event, "EventDeclaration");
+impl_try_from_for_class_decl!(EnumDeclaration, mm::EnumDeclaration, Enum, "EnumDeclaration");
 
-impl Decorated for MapDeclaration {
-    fn decorators(&self) -> &[mm::Decorator] {
-        self.0.decorators.as_deref().unwrap_or(&[])
+impl TryFrom<serde_json::Value> for MapDeclaration {
+    type Error = ConcertoError;
+    fn try_from(value: serde_json::Value) -> Result<Self> {
+        let inner: mm::MapDeclaration =
+            serde_json::from_value(value).map_err(|e| ConcertoError::IllegalModel {
+                message: format!("Invalid MapDeclaration: {e}"),
+                file_name: None,
+                location: None,
+            })?;
+        Ok(MapDeclaration(inner))
     }
 }
 
-// --- Named ---
+impl TryFrom<serde_json::Value> for ScalarDeclaration {
+    type Error = ConcertoError;
+    fn try_from(value: serde_json::Value) -> Result<Self> {
+        let class = value
+            .get("$class")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string();
+        let kind = model_util::get_short_name(&class).to_string();
 
-macro_rules! impl_named_for_inner {
-    ($ty:ty) => {
-        impl Named for $ty {
-            fn name(&self) -> &str {
-                &self.inner.name
+        let mk_err = |e: serde_json::Error, k: &str| ConcertoError::IllegalModel {
+            message: format!("Invalid {k}: {e}"),
+            file_name: None,
+            location: None,
+        };
+
+        let scalar_kind = match kind.as_str() {
+            "BooleanScalar" => ScalarDeclKind::Boolean(serde_json::from_value(value).map_err(|e| mk_err(e, &kind))?),
+            "IntegerScalar" => ScalarDeclKind::Integer(serde_json::from_value(value).map_err(|e| mk_err(e, &kind))?),
+            "LongScalar" => ScalarDeclKind::Long(serde_json::from_value(value).map_err(|e| mk_err(e, &kind))?),
+            "DoubleScalar" => ScalarDeclKind::Double(serde_json::from_value(value).map_err(|e| mk_err(e, &kind))?),
+            "StringScalar" => ScalarDeclKind::String(serde_json::from_value(value).map_err(|e| mk_err(e, &kind))?),
+            "DateTimeScalar" => ScalarDeclKind::DateTime(serde_json::from_value(value).map_err(|e| mk_err(e, &kind))?),
+            _ => {
+                return Err(ConcertoError::IllegalModel {
+                    message: format!("Unknown scalar type: {class}"),
+                    file_name: None,
+                    location: None,
+                });
             }
-            fn location(&self) -> Option<&mm::Range> {
-                self.inner.location.as_ref()
+        };
+
+        Ok(ScalarDeclaration(scalar_kind))
+    }
+}
+
+impl TryFrom<serde_json::Value> for Declaration {
+    type Error = ConcertoError;
+    fn try_from(value: serde_json::Value) -> Result<Self> {
+        let class = value
+            .get("$class")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string();
+        let kind = model_util::get_short_name(&class).to_string();
+
+        match kind.as_str() {
+            "ConceptDeclaration" => Ok(Declaration::Class(ClassDeclaration::Concept(
+                ConceptDeclaration::try_from(value)?,
+            ))),
+            "AssetDeclaration" => Ok(Declaration::Class(ClassDeclaration::Asset(
+                AssetDeclaration::try_from(value)?,
+            ))),
+            "ParticipantDeclaration" => Ok(Declaration::Class(ClassDeclaration::Participant(
+                ParticipantDeclaration::try_from(value)?,
+            ))),
+            "TransactionDeclaration" => Ok(Declaration::Class(ClassDeclaration::Transaction(
+                TransactionDeclaration::try_from(value)?,
+            ))),
+            "EventDeclaration" => Ok(Declaration::Class(ClassDeclaration::Event(
+                EventDeclaration::try_from(value)?,
+            ))),
+            "EnumDeclaration" => Ok(Declaration::Class(ClassDeclaration::Enum(
+                EnumDeclaration::try_from(value)?,
+            ))),
+            "MapDeclaration" => Ok(Declaration::Map(MapDeclaration::try_from(value)?)),
+            s if s.ends_with("Scalar") => {
+                Ok(Declaration::Scalar(ScalarDeclaration::try_from(value)?))
             }
+            _ => Err(ConcertoError::IllegalModel {
+                message: format!("Unknown declaration type: {class}"),
+                file_name: None,
+                location: None,
+            }),
         }
-    };
-}
-
-impl_named_for_inner!(ConceptDeclaration);
-impl_named_for_inner!(AssetDeclaration);
-impl_named_for_inner!(ParticipantDeclaration);
-impl_named_for_inner!(TransactionDeclaration);
-impl_named_for_inner!(EventDeclaration);
-impl_named_for_inner!(EnumDeclaration);
-
-impl Named for MapDeclaration {
-    fn name(&self) -> &str {
-        &self.0.name
-    }
-    fn location(&self) -> Option<&mm::Range> {
-        self.0.location.as_ref()
-    }
-}
-
-// --- HasProperties ---
-
-macro_rules! impl_has_properties {
-    ($ty:ty) => {
-        impl HasProperties for $ty {
-            fn own_properties(&self) -> &[PropertyDecl] {
-                &self.properties
-            }
-            fn super_type(&self) -> Option<&mm::TypeIdentifier> {
-                self.inner.super_type.as_ref()
-            }
-            fn is_abstract(&self) -> bool {
-                self.inner.is_abstract
-            }
-        }
-    };
-}
-
-impl_has_properties!(ConceptDeclaration);
-impl_has_properties!(AssetDeclaration);
-impl_has_properties!(ParticipantDeclaration);
-impl_has_properties!(TransactionDeclaration);
-impl_has_properties!(EventDeclaration);
-
-impl HasProperties for EnumDeclaration {
-    fn own_properties(&self) -> &[PropertyDecl] {
-        &self.properties
-    }
-    fn super_type(&self) -> Option<&mm::TypeIdentifier> {
-        None
-    }
-    fn is_abstract(&self) -> bool {
-        false
-    }
-}
-
-// --- Identifiable ---
-
-fn identified_from_ast(identified: &Option<mm::Identified>) -> (bool, bool, Option<&str>) {
-    match identified {
-        None => (false, false, None),
-        Some(id) => {
-            // The `Identified` struct just signals "system identified",
-            // while `IdentifiedBy` (encoded by checking the name field in
-            // the wrapper) would carry the explicit field name.
-            //
-            // In the metamodel the $class field discriminates:
-            //   concerto.metamodel@1.0.0.IdentifiedBy  (has `name`)
-            //   concerto.metamodel@1.0.0.Identified     (system)
-            let is_explicit =
-                id._class.ends_with(".IdentifiedBy") || id._class.contains("IdentifiedBy");
-            if is_explicit {
-                // IdentifiedBy – but the metamodel `Identified` struct
-                // doesn't have a `name` field; the JS side stuffs it into
-                // an extra IdentifiedBy struct.  For now we return true
-                // and callers will search the properties for $identifier.
-                (true, false, None)
-            } else {
-                (true, true, None)
-            }
-        }
-    }
-}
-
-macro_rules! impl_identifiable {
-    ($ty:ty) => {
-        impl Identifiable for $ty {
-            fn is_identified(&self) -> bool {
-                identified_from_ast(&self.inner.identified).0
-            }
-            fn is_system_identified(&self) -> bool {
-                identified_from_ast(&self.inner.identified).1
-            }
-            fn is_explicitly_identified(&self) -> bool {
-                let (ident, sys, _) = identified_from_ast(&self.inner.identified);
-                ident && !sys
-            }
-            fn identifier_field_name(&self) -> Option<&str> {
-                if self.is_system_identified() {
-                    Some("$identifier")
-                } else {
-                    identified_from_ast(&self.inner.identified).2
-                }
-            }
-        }
-    };
-}
-
-impl_identifiable!(ConceptDeclaration);
-impl_identifiable!(AssetDeclaration);
-impl_identifiable!(ParticipantDeclaration);
-impl_identifiable!(TransactionDeclaration);
-impl_identifiable!(EventDeclaration);
-
-impl Identifiable for EnumDeclaration {
-    fn is_identified(&self) -> bool {
-        false
-    }
-    fn is_system_identified(&self) -> bool {
-        false
-    }
-    fn is_explicitly_identified(&self) -> bool {
-        false
-    }
-    fn identifier_field_name(&self) -> Option<&str> {
-        None
     }
 }
 

@@ -140,91 +140,34 @@ impl PropertyDecl {
     }
 }
 
-/// Construct a [`PropertyDecl`] from serde_json by inspecting `$class`.
-impl PropertyDecl {
-    pub fn from_value(value: &serde_json::Value) -> crate::error::Result<Self> {
+/// Construct a [`PropertyDecl`] from AST JSON by inspecting `$class`.
+impl TryFrom<serde_json::Value> for PropertyDecl {
+    type Error = crate::error::ConcertoError;
+
+    fn try_from(value: serde_json::Value) -> crate::error::Result<Self> {
         let class = value
             .get("$class")
             .and_then(|v| v.as_str())
-            .unwrap_or("");
+            .unwrap_or("")
+            .to_string();
 
-        // The $class field ends with the type name, e.g.
-        // "concerto.metamodel@1.0.0.BooleanProperty"
-        let kind = crate::model_util::get_short_name(class);
+        let kind = crate::model_util::get_short_name(&class).to_string();
+        let mk_err = |e: serde_json::Error, k: &str| crate::error::ConcertoError::IllegalModel {
+            message: format!("Invalid {k}: {e}"),
+            file_name: None,
+            location: None,
+        };
 
-        match kind {
-            "BooleanProperty" => Ok(Self::Boolean(
-                serde_json::from_value(value.clone())
-                    .map_err(|e| crate::error::ConcertoError::IllegalModel {
-                        message: format!("Invalid BooleanProperty: {e}"),
-                        file_name: None,
-                        location: None,
-                    })?,
-            )),
-            "StringProperty" => Ok(Self::String(
-                serde_json::from_value(value.clone())
-                    .map_err(|e| crate::error::ConcertoError::IllegalModel {
-                        message: format!("Invalid StringProperty: {e}"),
-                        file_name: None,
-                        location: None,
-                    })?,
-            )),
-            "IntegerProperty" => Ok(Self::Integer(
-                serde_json::from_value(value.clone())
-                    .map_err(|e| crate::error::ConcertoError::IllegalModel {
-                        message: format!("Invalid IntegerProperty: {e}"),
-                        file_name: None,
-                        location: None,
-                    })?,
-            )),
-            "LongProperty" => Ok(Self::Long(
-                serde_json::from_value(value.clone())
-                    .map_err(|e| crate::error::ConcertoError::IllegalModel {
-                        message: format!("Invalid LongProperty: {e}"),
-                        file_name: None,
-                        location: None,
-                    })?,
-            )),
-            "DoubleProperty" => Ok(Self::Double(
-                serde_json::from_value(value.clone())
-                    .map_err(|e| crate::error::ConcertoError::IllegalModel {
-                        message: format!("Invalid DoubleProperty: {e}"),
-                        file_name: None,
-                        location: None,
-                    })?,
-            )),
-            "DateTimeProperty" => Ok(Self::DateTime(
-                serde_json::from_value(value.clone())
-                    .map_err(|e| crate::error::ConcertoError::IllegalModel {
-                        message: format!("Invalid DateTimeProperty: {e}"),
-                        file_name: None,
-                        location: None,
-                    })?,
-            )),
-            "ObjectProperty" => Ok(Self::Object(
-                serde_json::from_value(value.clone())
-                    .map_err(|e| crate::error::ConcertoError::IllegalModel {
-                        message: format!("Invalid ObjectProperty: {e}"),
-                        file_name: None,
-                        location: None,
-                    })?,
-            )),
-            "RelationshipProperty" => Ok(Self::Relationship(
-                serde_json::from_value(value.clone())
-                    .map_err(|e| crate::error::ConcertoError::IllegalModel {
-                        message: format!("Invalid RelationshipProperty: {e}"),
-                        file_name: None,
-                        location: None,
-                    })?,
-            )),
-            "EnumProperty" => Ok(Self::Enum(
-                serde_json::from_value(value.clone())
-                    .map_err(|e| crate::error::ConcertoError::IllegalModel {
-                        message: format!("Invalid EnumProperty: {e}"),
-                        file_name: None,
-                        location: None,
-                    })?,
-            )),
+        match kind.as_str() {
+            "BooleanProperty" => Ok(Self::Boolean(serde_json::from_value(value).map_err(|e| mk_err(e, &kind))?)),
+            "StringProperty" => Ok(Self::String(serde_json::from_value(value).map_err(|e| mk_err(e, &kind))?)),
+            "IntegerProperty" => Ok(Self::Integer(serde_json::from_value(value).map_err(|e| mk_err(e, &kind))?)),
+            "LongProperty" => Ok(Self::Long(serde_json::from_value(value).map_err(|e| mk_err(e, &kind))?)),
+            "DoubleProperty" => Ok(Self::Double(serde_json::from_value(value).map_err(|e| mk_err(e, &kind))?)),
+            "DateTimeProperty" => Ok(Self::DateTime(serde_json::from_value(value).map_err(|e| mk_err(e, &kind))?)),
+            "ObjectProperty" => Ok(Self::Object(serde_json::from_value(value).map_err(|e| mk_err(e, &kind))?)),
+            "RelationshipProperty" => Ok(Self::Relationship(serde_json::from_value(value).map_err(|e| mk_err(e, &kind))?)),
+            "EnumProperty" => Ok(Self::Enum(serde_json::from_value(value).map_err(|e| mk_err(e, &kind))?)),
             _ => Err(crate::error::ConcertoError::IllegalModel {
                 message: format!("Unknown property type: {class}"),
                 file_name: None,

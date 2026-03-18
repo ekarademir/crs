@@ -5,7 +5,6 @@ use crate::model_util;
 
 use super::declarations::*;
 use super::imports::ImportDecl;
-use super::properties::PropertyDecl;
 use super::traits::Named;
 
 /// A parsed model file with resolved declarations and imports.
@@ -25,8 +24,9 @@ impl ModelFile {
     /// Build a [`ModelFile`] by deserializing the raw JSON AST of a
     /// `concerto.metamodel@1.0.0.Model`.
     ///
-    /// This inspects the `$class` discriminator on each declaration and
-    /// property to construct the correct sum-type variant.
+    /// This delegates to `Declaration::try_from` which inspects the `$class`
+    /// discriminator on each declaration and property to construct the correct
+    /// sum-type variant.
     pub fn from_json(json: &serde_json::Value, file_name: Option<String>) -> Result<Self> {
         let namespace = json
             .get("namespace")
@@ -49,7 +49,7 @@ impl ModelFile {
         let imports = match json.get("imports") {
             Some(serde_json::Value::Array(arr)) => arr
                 .iter()
-                .map(ImportDecl::from_value)
+                .map(|v| ImportDecl::try_from(v.clone()))
                 .collect::<Result<Vec<_>>>()?,
             _ => vec![],
         };
@@ -64,7 +64,14 @@ impl ModelFile {
         let mut local_types = HashMap::new();
 
         for (idx, raw) in raw_decls.iter().enumerate() {
-            let decl = Self::parse_declaration(raw, &file_name)?;
+            let decl = Declaration::try_from(raw.clone()).map_err(|e| match e {
+                ConcertoError::IllegalModel { message, .. } => ConcertoError::IllegalModel {
+                    message,
+                    file_name: file_name.clone(),
+                    location: None,
+                },
+                other => other,
+            })?;
             local_types.insert(decl.name().to_string(), idx);
             declarations.push(decl);
         }
@@ -95,188 +102,6 @@ impl ModelFile {
             local_types: HashMap::new(),
             file_name,
             is_external,
-        }
-    }
-
-    /// Parse a single declaration JSON value into a [`Declaration`].
-    fn parse_declaration(
-        value: &serde_json::Value,
-        file_name: &Option<String>,
-    ) -> Result<Declaration> {
-        let class = value
-            .get("$class")
-            .and_then(|v| v.as_str())
-            .unwrap_or("");
-        let kind = model_util::get_short_name(class);
-
-        match kind {
-            "ConceptDeclaration" => {
-                let inner: concerto_metamodel::concerto_metamodel_1_0_0::ConceptDeclaration =
-                    serde_json::from_value(value.clone()).map_err(|e| {
-                        ConcertoError::IllegalModel {
-                            message: format!("Invalid ConceptDeclaration: {e}"),
-                            file_name: file_name.clone(),
-                            location: None,
-                        }
-                    })?;
-                let properties = Self::parse_properties(value, file_name)?;
-                Ok(Declaration::Class(ClassDeclaration::Concept(
-                    ConceptDeclaration { inner, properties },
-                )))
-            }
-            "AssetDeclaration" => {
-                let inner: concerto_metamodel::concerto_metamodel_1_0_0::AssetDeclaration =
-                    serde_json::from_value(value.clone()).map_err(|e| {
-                        ConcertoError::IllegalModel {
-                            message: format!("Invalid AssetDeclaration: {e}"),
-                            file_name: file_name.clone(),
-                            location: None,
-                        }
-                    })?;
-                let properties = Self::parse_properties(value, file_name)?;
-                Ok(Declaration::Class(ClassDeclaration::Asset(
-                    AssetDeclaration { inner, properties },
-                )))
-            }
-            "ParticipantDeclaration" => {
-                let inner: concerto_metamodel::concerto_metamodel_1_0_0::ParticipantDeclaration =
-                    serde_json::from_value(value.clone()).map_err(|e| {
-                        ConcertoError::IllegalModel {
-                            message: format!("Invalid ParticipantDeclaration: {e}"),
-                            file_name: file_name.clone(),
-                            location: None,
-                        }
-                    })?;
-                let properties = Self::parse_properties(value, file_name)?;
-                Ok(Declaration::Class(ClassDeclaration::Participant(
-                    ParticipantDeclaration { inner, properties },
-                )))
-            }
-            "TransactionDeclaration" => {
-                let inner: concerto_metamodel::concerto_metamodel_1_0_0::TransactionDeclaration =
-                    serde_json::from_value(value.clone()).map_err(|e| {
-                        ConcertoError::IllegalModel {
-                            message: format!("Invalid TransactionDeclaration: {e}"),
-                            file_name: file_name.clone(),
-                            location: None,
-                        }
-                    })?;
-                let properties = Self::parse_properties(value, file_name)?;
-                Ok(Declaration::Class(ClassDeclaration::Transaction(
-                    TransactionDeclaration { inner, properties },
-                )))
-            }
-            "EventDeclaration" => {
-                let inner: concerto_metamodel::concerto_metamodel_1_0_0::EventDeclaration =
-                    serde_json::from_value(value.clone()).map_err(|e| {
-                        ConcertoError::IllegalModel {
-                            message: format!("Invalid EventDeclaration: {e}"),
-                            file_name: file_name.clone(),
-                            location: None,
-                        }
-                    })?;
-                let properties = Self::parse_properties(value, file_name)?;
-                Ok(Declaration::Class(ClassDeclaration::Event(
-                    EventDeclaration { inner, properties },
-                )))
-            }
-            "EnumDeclaration" => {
-                let inner: concerto_metamodel::concerto_metamodel_1_0_0::EnumDeclaration =
-                    serde_json::from_value(value.clone()).map_err(|e| {
-                        ConcertoError::IllegalModel {
-                            message: format!("Invalid EnumDeclaration: {e}"),
-                            file_name: file_name.clone(),
-                            location: None,
-                        }
-                    })?;
-                let properties = Self::parse_properties(value, file_name)?;
-                Ok(Declaration::Class(ClassDeclaration::Enum(
-                    EnumDeclaration { inner, properties },
-                )))
-            }
-            "MapDeclaration" => {
-                let inner: concerto_metamodel::concerto_metamodel_1_0_0::MapDeclaration =
-                    serde_json::from_value(value.clone()).map_err(|e| {
-                        ConcertoError::IllegalModel {
-                            message: format!("Invalid MapDeclaration: {e}"),
-                            file_name: file_name.clone(),
-                            location: None,
-                        }
-                    })?;
-                Ok(Declaration::Map(MapDeclaration(inner)))
-            }
-            s if s.ends_with("Scalar") => {
-                let scalar_kind = Self::parse_scalar(value, file_name)?;
-                Ok(Declaration::Scalar(ScalarDeclaration(scalar_kind)))
-            }
-            _ => Err(ConcertoError::IllegalModel {
-                message: format!("Unknown declaration type: {class}"),
-                file_name: file_name.clone(),
-                location: None,
-            }),
-        }
-    }
-
-    fn parse_scalar(
-        value: &serde_json::Value,
-        file_name: &Option<String>,
-    ) -> Result<ScalarDeclKind> {
-        let class = value
-            .get("$class")
-            .and_then(|v| v.as_str())
-            .unwrap_or("");
-        let kind = model_util::get_short_name(class);
-
-        let err = |e: serde_json::Error| ConcertoError::IllegalModel {
-            message: format!("Invalid {kind}: {e}"),
-            file_name: file_name.clone(),
-            location: None,
-        };
-
-        match kind {
-            "BooleanScalar" => Ok(ScalarDeclKind::Boolean(
-                serde_json::from_value(value.clone()).map_err(err)?,
-            )),
-            "IntegerScalar" => Ok(ScalarDeclKind::Integer(
-                serde_json::from_value(value.clone()).map_err(err)?,
-            )),
-            "LongScalar" => Ok(ScalarDeclKind::Long(
-                serde_json::from_value(value.clone()).map_err(err)?,
-            )),
-            "DoubleScalar" => Ok(ScalarDeclKind::Double(
-                serde_json::from_value(value.clone()).map_err(err)?,
-            )),
-            "StringScalar" => Ok(ScalarDeclKind::String(
-                serde_json::from_value(value.clone()).map_err(err)?,
-            )),
-            "DateTimeScalar" => Ok(ScalarDeclKind::DateTime(
-                serde_json::from_value(value.clone()).map_err(err)?,
-            )),
-            _ => Err(ConcertoError::IllegalModel {
-                message: format!("Unknown scalar type: {class}"),
-                file_name: file_name.clone(),
-                location: None,
-            }),
-        }
-    }
-
-    fn parse_properties(
-        decl_value: &serde_json::Value,
-        file_name: &Option<String>,
-    ) -> Result<Vec<PropertyDecl>> {
-        match decl_value.get("properties") {
-            Some(serde_json::Value::Array(arr)) => arr
-                .iter()
-                .map(|v| PropertyDecl::from_value(v).map_err(|e| match e {
-                    ConcertoError::IllegalModel { message, .. } => ConcertoError::IllegalModel {
-                        message,
-                        file_name: file_name.clone(),
-                        location: None,
-                    },
-                    other => other,
-                }))
-                .collect(),
-            _ => Ok(vec![]),
         }
     }
 
@@ -451,12 +276,10 @@ impl ModelFile {
 mod tests {
     use super::*;
 
-    const ROOT_MODEL_JSON: &str = include_str!("../rootmodel.json");
-
     #[test]
     fn test_parse_root_model() {
-        let json: serde_json::Value = serde_json::from_str(ROOT_MODEL_JSON).unwrap();
-        let mf = ModelFile::from_json(&json, Some("rootmodel.json".into())).unwrap();
+        let json = crate::rootmodel::root_model_ast();
+        let mf = ModelFile::from_json(&json, Some("rootmodel".into())).unwrap();
 
         assert_eq!(mf.namespace(), "concerto@1.0.0");
         assert_eq!(mf.version(), Some("1.0.0"));
@@ -478,7 +301,7 @@ mod tests {
 
     #[test]
     fn test_fully_qualified_type_name() {
-        let json: serde_json::Value = serde_json::from_str(ROOT_MODEL_JSON).unwrap();
+        let json = crate::rootmodel::root_model_ast();
         let mf = ModelFile::from_json(&json, None).unwrap();
 
         assert_eq!(

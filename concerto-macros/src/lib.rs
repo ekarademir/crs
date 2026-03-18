@@ -172,3 +172,75 @@ pub fn derive_has_properties(input: TokenStream) -> TokenStream {
 
     expanded.into()
 }
+
+/// Derive macro for the `Identifiable` trait.
+///
+/// Expects the struct to have an `identified: Option<Identified>` field,
+/// or be a newtype wrapping a struct that does.
+///
+/// The `$class` discriminator on the `Identified` value determines whether
+/// the identification is system-provided or explicit:
+///   - `concerto.metamodel@1.0.0.Identified` → system identified
+///   - `concerto.metamodel@1.0.0.IdentifiedBy` → explicitly identified
+#[proc_macro_derive(Identifiable)]
+pub fn derive_identifiable(input: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(input as DeriveInput);
+    let name = &input.ident;
+    let generics = &input.generics;
+    let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
+
+    let identified_expr = match &input.data {
+        Data::Struct(data) => match &data.fields {
+            Fields::Unnamed(fields) if fields.unnamed.len() == 1 => {
+                quote! { &self.0.identified }
+            }
+            Fields::Named(_) => {
+                quote! { &self.identified }
+            }
+            _ => {
+                return syn::Error::new_spanned(
+                    &input,
+                    "Identifiable can only be derived for named structs or newtypes",
+                )
+                .to_compile_error()
+                .into();
+            }
+        },
+        _ => {
+            return syn::Error::new_spanned(
+                &input,
+                "Identifiable can only be derived for structs",
+            )
+            .to_compile_error()
+            .into();
+        }
+    };
+
+    let expanded = quote! {
+        impl #impl_generics crate::introspect::traits::Identifiable for #name #ty_generics #where_clause {
+            fn is_identified(&self) -> bool {
+                (#identified_expr).is_some()
+            }
+            fn is_system_identified(&self) -> bool {
+                match #identified_expr {
+                    Some(id) => !id._class.contains("IdentifiedBy"),
+                    None => false,
+                }
+            }
+            fn is_explicitly_identified(&self) -> bool {
+                match #identified_expr {
+                    Some(id) => id._class.contains("IdentifiedBy"),
+                    None => false,
+                }
+            }
+            fn identifier_field_name(&self) -> Option<&str> {
+                match #identified_expr {
+                    Some(id) if !id._class.contains("IdentifiedBy") => Some("$identifier"),
+                    _ => None,
+                }
+            }
+        }
+    };
+
+    expanded.into()
+}

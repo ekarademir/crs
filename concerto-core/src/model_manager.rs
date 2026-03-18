@@ -32,8 +32,6 @@ impl Default for ModelManagerOptions {
 // ModelManager
 // ===================================================================
 
-const ROOT_MODEL_JSON: &str = include_str!("rootmodel.json");
-
 /// Manages a set of Concerto model files, providing type resolution
 /// and validation across namespaces.
 #[derive(Debug)]
@@ -54,13 +52,8 @@ impl ModelManager {
     }
 
     fn add_root_model(&mut self) -> Result<()> {
-        let json: serde_json::Value = serde_json::from_str(ROOT_MODEL_JSON)
-            .map_err(|e| ConcertoError::IllegalModel {
-                message: format!("Failed to parse root model: {e}"),
-                file_name: Some("rootmodel.json".into()),
-                location: None,
-            })?;
-        let mf = ModelFile::from_json(&json, Some("rootmodel.json".into()))?;
+        let json = crate::rootmodel::root_model_ast();
+        let mf = ModelFile::from_json(&json, Some("rootmodel".into()))?;
         self.model_files.insert(mf.namespace().to_string(), mf);
         Ok(())
     }

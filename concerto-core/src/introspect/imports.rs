@@ -47,38 +47,29 @@ impl ImportDecl {
         }
     }
 
-    /// Construct from a serde_json::Value by inspecting `$class`.
-    pub fn from_value(value: &serde_json::Value) -> crate::error::Result<Self> {
+}
+
+/// Construct an [`ImportDecl`] from AST JSON by inspecting `$class`.
+impl TryFrom<serde_json::Value> for ImportDecl {
+    type Error = crate::error::ConcertoError;
+
+    fn try_from(value: serde_json::Value) -> crate::error::Result<Self> {
         let class = value
             .get("$class")
             .and_then(|v| v.as_str())
-            .unwrap_or("");
-        let kind = crate::model_util::get_short_name(class);
+            .unwrap_or("")
+            .to_string();
+        let kind = crate::model_util::get_short_name(&class).to_string();
+        let mk_err = |e: serde_json::Error, k: &str| crate::error::ConcertoError::IllegalModel {
+            message: format!("Invalid {k}: {e}"),
+            file_name: None,
+            location: None,
+        };
 
-        match kind {
-            "ImportAll" => Ok(Self::All(serde_json::from_value(value.clone()).map_err(
-                |e| crate::error::ConcertoError::IllegalModel {
-                    message: format!("Invalid ImportAll: {e}"),
-                    file_name: None,
-                    location: None,
-                },
-            )?)),
-            "ImportType" => Ok(Self::Type(serde_json::from_value(value.clone()).map_err(
-                |e| crate::error::ConcertoError::IllegalModel {
-                    message: format!("Invalid ImportType: {e}"),
-                    file_name: None,
-                    location: None,
-                },
-            )?)),
-            "ImportTypes" => Ok(Self::Types(
-                serde_json::from_value(value.clone()).map_err(|e| {
-                    crate::error::ConcertoError::IllegalModel {
-                        message: format!("Invalid ImportTypes: {e}"),
-                        file_name: None,
-                        location: None,
-                    }
-                })?,
-            )),
+        match kind.as_str() {
+            "ImportAll" => Ok(Self::All(serde_json::from_value(value).map_err(|e| mk_err(e, &kind))?)),
+            "ImportType" => Ok(Self::Type(serde_json::from_value(value).map_err(|e| mk_err(e, &kind))?)),
+            "ImportTypes" => Ok(Self::Types(serde_json::from_value(value).map_err(|e| mk_err(e, &kind))?)),
             _ => Err(crate::error::ConcertoError::IllegalModel {
                 message: format!("Unknown import type: {class}"),
                 file_name: None,
