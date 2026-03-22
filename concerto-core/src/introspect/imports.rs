@@ -1,10 +1,17 @@
 use concerto_metamodel::concerto_metamodel_1_0_0 as mm;
 
-/// Sum type for imports, mirroring the JS import hierarchy.
+/// Sum type for all import types in Concerto.
+/// See [Concerto documentation on imports](https://concerto.accordproject.org/docs/design/specification/model-imports).
 #[derive(Debug, Clone)]
 pub enum ImportDecl {
+    /// Corresponds to `import com.example.test.*`.
+    /// This is only allowed in non-strict mode.
     All(mm::ImportAll),
+    /// Corresponds to importing a single type from
+    /// a namespace. `import com.example.test@1.0.0.Foo`
     Type(mm::ImportType),
+    /// Corresponds to importing several types from
+    /// a namespace. `import com.example.test@1.0.0.{Foo, Bar}`
     Types(mm::ImportTypes),
 }
 
